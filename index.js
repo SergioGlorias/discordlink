@@ -2,6 +2,7 @@ import express from "express"
 import rateLimit from "express-rate-limit"
 import MongoStore from "rate-limit-mongo"
 import fetch from "node-fetch"
+import { createRequire } from "module"
 const require = createRequire(import.meta.url)
 const config = require("./token.json")
 import { CronJob } from "cron"
