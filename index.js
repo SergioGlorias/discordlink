@@ -1,12 +1,22 @@
-const express = require("express")
-const rateLimit = require("express-rate-limit")
-const fetch = require("node-fetch")
-const { token } = require("./token.json")
-const CronJob = require('cron').CronJob
+import express from "express"
+import rateLimit from "express-rate-limit"
+import MongoStore from "rate-limit-mongo"
+import fetch from "node-fetch"
+const config = import("./token.json")
+import { CronJob } from "cron"
+
 const app = express()
+
 app.set('trust proxy', 1)
+
 const limiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
+    store: new MongoStore({
+        uri: `mongodb://${config.mongoDB.ip}/${config.mongoDB.database}`,
+        user: config.mongoDB.user,
+        password: config.mongoDB.password,
+        expireTimeMs: 60 * 60 * 1000,
+    }),
+    windowMs: 15 * 60 * 1000,
     max: 1,
     message: "Então... só gero um link por Hora!\nNota: o link que você gerou só dura 10 mins!!",
 })
@@ -14,7 +24,7 @@ app.use(limiter)
 
 async function inviter() {
     try {
-        return await fetch("https://discord.com/api/v8/channels/743496401043980328/invites", {
+        return await fetch(`https://discord.com/api/v8/channels/${config.discord.ChannelID}/invites`, {
             method: 'post',
             body: JSON.stringify({
                 "max_age": 600,
@@ -23,7 +33,7 @@ async function inviter() {
             }),
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bot ${token}`
+                'Authorization': `Bot ${config.discord.token}`
             }
         }).then(async data => {
             let header = await data.headers.raw()

@@ -1,3 +1,12 @@
 {
-    "token": ""
+    "discord": {
+        "token": "",
+        "ChannelID": ""
+    },
+    "mongoDB": {
+        "ip": "",
+        "database": "",
+        "user": "",
+        "password": ""
+    }
 }
