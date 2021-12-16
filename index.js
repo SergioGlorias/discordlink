@@ -20,7 +20,7 @@ const limiter = rateLimit({
     }),
     windowMs: 15 * 60 * 1000,
     max: 1,
-    message: "Então... só gero um link por Hora!\nNota: o link que você gerou só dura 10 mins!!",
+    message: ""An Invite has already been generated for you. You can join once with that invite. \nThe link is only available for 10 minutes. You can try again in 2 hours.",
 })
 app.use(limiter)
 
@@ -83,7 +83,7 @@ const rS = new CronJob('0 0 * * * *', function () {
 }, null)
 
 app.listen(3001, () => {
-    console.log("Servidor Online e Pronto para gerar codigo!!")
+    console.log("Ready to generate invite!")
     rH.start()
     rS.start()
 })
