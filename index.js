@@ -20,7 +20,7 @@ const limiter = rateLimit({
     }),
     windowMs: 15 * 60 * 1000,
     max: 1,
-    message: ""An Invite has already been generated for you. You can join once with that invite. \nThe link is only available for 10 minutes. You can try again in 2 hours.",
+    message: "An Invite has already been generated for you. You can join once with that invite. \nThe link is only available for 10 minutes. You can try again in 2 hours.",
 })
 app.use(limiter)
 
