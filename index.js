@@ -88,6 +88,9 @@ app.get("/callback", async (request, reply) => {
                 Country: request.headers["cf-ipcountry"] || "Country not found",
             }
 
+            // UserData.IP is array or string
+            if (Array.isArray(UserData.IP)) UserData.IP = UserData.IP.join("\n")
+
             const user = await fetch(`https://discordapp.com/api/users/@me`, {
                 headers: {
                     Authorization: `${oauth2.token_type} ${oauth2.access_token}`
