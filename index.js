@@ -173,7 +173,7 @@ app.get("/callback", async (request, reply) => {
                         access_token: oauth2.access_token,
                         roles: [config.discord.roleId]
                     })
-                })
+                }).then(res => res.json()).then(res => console.log(res))
             } else {
                 await fetch(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
                     method: "PATCH",
@@ -183,7 +183,7 @@ app.get("/callback", async (request, reply) => {
                     body: JSON.stringify({
                         roles: [config.discord.roleId]
                     })
-                })
+                }).then(res => res.json()).then(res => console.log(res))
             }
 
             const embed = new MessageEmbed()
