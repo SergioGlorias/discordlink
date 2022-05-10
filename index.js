@@ -167,7 +167,8 @@ app.get("/callback", async (request, reply) => {
                 await fetch(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
                     method: "PUT",
                     headers: {
-                        Authorization: `Bot ${config.discord.botToken}`
+                        Authorization: `Bot ${config.discord.botToken}`,
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
                         access_token: oauth2.access_token,
@@ -178,7 +179,8 @@ app.get("/callback", async (request, reply) => {
                 await fetch(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
                     method: "PATCH",
                     headers: {
-                        Authorization: `Bot ${config.discord.botToken}`
+                        Authorization: `Bot ${config.discord.botToken}`,
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
                         roles: [config.discord.roleId]
