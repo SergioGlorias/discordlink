@@ -84,20 +84,20 @@ app.get("/callback", async (request, reply) => {
         if (oauth2.scope.includes("guilds") && oauth2.scope.includes("guilds.join") && oauth2.scope.includes("identify")) {
 
             const UserData = {
-                IP: request.headers["CF-Connecting-IP"] || "IP not found",
-                Country: request.headers["CF-IPCountry"] || "Country not found",
+                IP: request.headers["cf-connecting-ip"] || "IP not found",
+                Country: request.headers["cf-ipcountry"] || "Country not found",
             }
 
             let IPinfo
 
-            if (await checkIPv4(request.headers["CF-Connecting-IP"])) {
+            if (await checkIPv4(request.headers["cf-connecting-ip"])) {
                 IPinfo = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.cloudflare.accountId}/intel/ip?ipv4=${request.headers["CF-Connecting-IP"]}`, {
                     headers: {
                         "X-Auth-Key": config.cloudflare.apiKey,
                         "X-Auth-Email": config.cloudflare.email
                     }
                 }).then(res => res.json())
-            } else if (await checkIPv6(request.headers["CF-Connecting-IP"])) {
+            } else if (await checkIPv6(request.headers["cf-connecting-ip"])) {
                 IPinfo = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.cloudflare.accountId}/intel/ip?ipv6=${request.headers["CF-Connecting-IP"]}`, {
                     headers: {
                         "X-Auth-Key": config.cloudflare.apiKey,
@@ -190,12 +190,12 @@ app.get("/callback", async (request, reply) => {
             if (listJSON[UserData.IP] === undefined) {
                 listJSON[UserData.IP] = {
                     IP: UserData.IP,
-                    LastLogin: dayjs().toISOString(),
+                    LastLogin: dayjs().unix(),
                 }
             } else if (dayjs(listJSON[UserData.IP].LastLogin).add(6, "hours").isBefore(dayjs())) {
                 return reply.code(429).redirect("https://http.cat/429")
             } else {
-                listJSON[UserData.IP].LastLogin = dayjs().toISOString()
+                listJSON[UserData.IP].LastLogin = dayjs().unix()
             }
 
             fs.writeFileSync("./IPcount.json", JSON.stringify(listJSON))
