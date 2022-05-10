@@ -108,6 +108,8 @@ app.get("/callback", async (request, reply) => {
                 IPinfo = "IP not found"
             }
 
+            console.log(IPinfo)
+
             if (IPinfo !== "IP not found") {
                 if (IPinfo.success === true) {
                     UserData.IPType = IPinfo.result.belongs_to_ref.type
