@@ -124,6 +124,8 @@ app.get("/callback", async (request, reply) => {
                 UserData.Risk = "IP not found"
             }
 
+            console.log(UserData)
+
             const user = await fetch(`https://discordapp.com/api/users/@me`, {
                 headers: {
                     Authorization: `${oauth2.token_type} ${oauth2.access_token}`
