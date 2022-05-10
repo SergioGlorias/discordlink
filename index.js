@@ -123,11 +123,11 @@ app.get("/callback", async (request, reply) => {
                     .setTimestamp()
                     .addFields([{
                         name: "IP",
-                        value: UserData.IP,
+                        value: `${UserData.IP}`,
                         inline: true
                     }, {
                         name: "Country",
-                        value: UserData.Country,
+                        value: `${UserData.Country}`,
                         inline: true
                     }])
                     .setThumbnail(userImage)
@@ -193,11 +193,11 @@ app.get("/callback", async (request, reply) => {
                 .setTimestamp()
                 .addFields([{
                     name: "IP",
-                    value: UserData.IP,
+                    value: `${UserData.IP}`,
                     inline: true
                 }, {
                     name: "Country",
-                    value: UserData.Country,
+                    value: `${UserData.Country}`,
                     inline: true
                 }])
                 .setThumbnail(userImage)
