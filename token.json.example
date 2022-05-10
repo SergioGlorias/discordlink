@@ -1,12 +1,18 @@
 {
+    "domain": "",
+    "port": "",
     "discord": {
-        "token": "",
-        "ChannelID": ""
+        "clientId": "",
+        "clientSecret": "",
+        "webhookUrl": "",
+        "botToken": "",
+        "roleId": "",
+        "guildId": ""
     },
-    "mongoDB": {
-        "ip": "",
-        "database": "",
-        "user": "",
-        "password": ""
+
+    "cloudflare": {
+        "email": "",
+        "apiKey": "",
+        "accountId": ""
     }
 }

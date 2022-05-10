@@ -1,89 +1,280 @@
-import express from "express"
-import rateLimit from "express-rate-limit"
-import MongoStore from "rate-limit-mongo"
-import fetch from "node-fetch"
 import { createRequire } from "module"
 const require = createRequire(import.meta.url)
 const config = require("./token.json")
-import { CronJob } from "cron"
 
-const app = express()
+import fastify from "fastify"
+import fastifyOauth2 from "@fastify/oauth2"
 
-app.set('trust proxy', 1)
+const app = fastify({ logger: true })
 
-const limiter = rateLimit({
-    store: new MongoStore({
-        uri: `mongodb://${config.mongoDB.ip}/${config.mongoDB.database}`,
-        user: config.mongoDB.user,
-        password: config.mongoDB.password,
-        expireTimeMs: 60 * 60 * 1000,
-    }),
-    windowMs: 15 * 60 * 1000,
-    max: 1,
-    message: "An Invite has already been generated for you. You can join once with that invite. \nThe link is only available for 10 minutes. You can try again in 2 hours.",
+import fetch from "node-fetch"
+
+import { getName } from "country-list"
+
+import { WebhookClient, MessageEmbed } from "discord.js"
+const webhook = new WebhookClient({ url: config.discord.webhookUrl }, {
+    restRequestTimeout: 1 * 60 * 1000
 })
-app.use(limiter)
 
-async function inviter() {
-    try {
-        return await fetch(`https://discord.com/api/v8/channels/${config.discord.ChannelID}/invites`, {
-            method: 'post',
-            body: JSON.stringify({
-                "max_age": 600,
-                "max_uses": 1,
-                "unique": true
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bot ${config.discord.token}`
-            }
-        }).then(async data => {
-            let header = await data.headers.raw()
-            let body = await data.json()
+import fs from "fs"
+import dayjs from "dayjs"
 
-            return {
-                header: header,
-                body: body
-            }
-        })
-    } catch (error) {
-        console.error(error)
-        return undefined
+if (!fs.readdirSync("./", { withFileTypes: true }).filter(dirent => !dirent.isDirectory()).find(dirent => dirent.name === "IPcount.json")) {
+    fs.writeFileSync("./IPcount.json", JSON.stringify({}))
+}
+
+async function Country(Country) {
+    let response
+    if (Country === "T1") {
+        response = "Tor"
+    } else {
+        response = getName(Country)
     }
+
+    return response
 }
 
-let rateValid = 25000
-let rateHour = 1000
-let rateSec = 45
-
-function timerRate(left) {
-    setTimeout(() => rateValid = 25000, left * 1000)
+async function checkIPv4(ip) {
+    const RegexIPv4 = /(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}/gm
+    const response = RegexIPv4.test(ip)
+    return response
 }
 
-app.get("/", async (req, res) => {
-    if (rateHour === 0 || rateSec === 0 || rateValid === 0) return res.status(429).send("Infelizmente não posso gerar mais links por agora, volte daqui a 1 hora!!")
-    rateHour -= 1
-    rateSec -= 1
-    const invite = await inviter()
-    if (invite === undefined) return res.status(500).send("Infelizmente não consegui gerar 1 link por agora, volte daqui a 1 hora!!")
-    rateValid = parseInt(invite.header['x-ratelimit-remaining'][0])
-    if (rateValid === 0) timerRate(parseFloat(invite.header['x-ratelimit-reset-after'][0]))
-    res.redirect(`https://discord.gg/${invite.body.code}`)
+async function checkIPv6(ip) {
+    const RegexIPv6 = /(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))/gm
+    const response = RegexIPv6.test(ip)
+    return response
+}
+
+const validStates = new Set()
+import crypto from "crypto"
+
+app.register(fastifyOauth2, {
+    name: "discord",
+    credentials: {
+        client: {
+            id: config.discord.clientId,
+            secret: config.discord.clientSecret
+        },
+        auth: fastifyOauth2.DISCORD_CONFIGURATION,
+    },
+    scope: ["identify", "guilds", "guilds.join"],
+    startRedirectPath: "/",
+    callbackUri: `http://${config.domain}/callback`,
+    generateStateFunction: (request) => {
+        const state = crypto.randomBytes(20).toString("hex")
+        validStates.add(state)
+        return state
+    },
+    // custom function to check the state is valid
+    checkStateFunction: (returnedState, callback) => {
+        if (validStates.has(returnedState)) {
+            callback()
+            return
+        }
+        callback(new Error('Invalid state'))
+    }
 })
 
-app.use(function (req, res) {
-    res.status(404).redirect("/");
+app.get("/callback", async (request, reply) => {
+    try {
+
+        const oauth2 = await app.discord.getAccessTokenFromAuthorizationCodeFlow(request)
+
+        if (oauth2.scope.includes("guilds") && oauth2.scope.includes("guilds.join") && oauth2.scope.includes("identify")) {
+
+            const UserData = {
+                IP: request.headers["CF-Connecting-IP"] || "IP not found",
+                Country: request.headers["CF-IPCountry"] || "Country not found",
+            }
+
+            let IPinfo
+
+            if (await checkIPv4(request.headers["CF-Connecting-IP"])) {
+                IPinfo = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.cloudflare.accountId}/intel/ip?ipv4=${request.headers["CF-Connecting-IP"]}`, {
+                    headers: {
+                        "X-Auth-Key": config.cloudflare.apiKey,
+                        "X-Auth-Email": config.cloudflare.email
+                    }
+                }).then(res => res.json())
+            } else if (await checkIPv6(request.headers["CF-Connecting-IP"])) {
+                IPinfo = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.cloudflare.accountId}/intel/ip?ipv6=${request.headers["CF-Connecting-IP"]}`, {
+                    headers: {
+                        "X-Auth-Key": config.cloudflare.apiKey,
+                        "X-Auth-Email": config.cloudflare.email
+                    }
+                }).then(res => res.json())
+            } else {
+                IPinfo = "IP not found"
+            }
+
+            if (IPinfo !== "IP not found") {
+                if (IPinfo.success === true) {
+                    UserData.IPType = IPinfo.result.belongs_to_ref.type
+                    UserData.IPDescription = IPinfo.result.belongs_to_ref.description
+                    UserData.Risk = IPinfo.result.risk_types.map(risk => risk.name)
+                } else {
+                    UserData.IPType = "Error"
+                    UserData.IPDescription = "Error"
+                    UserData.Risk = "Error"
+                }
+            } else {
+                UserData.IPType = "IP not found"
+                UserData.IPDescription = "IP not found"
+                UserData.Risk = "IP not found"
+            }
+
+            const user = await fetch(`https://discordapp.com/api/users/@me`, {
+                headers: {
+                    Authorization: `${oauth2.token_type} ${oauth2.access_token}`
+                }
+            }).then(res => res.json())
+
+            if (!user.id) return reply.code(500).send("Error")
+
+            UserData.User = user
+
+            let userImage
+
+            if (user.avatar) {
+                if (user.avatar.startsWith("a_")) userImage = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.gif`
+                else userImage = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+            } else {
+                userImage = `https://cdn.discordapp.com/embed/avatars/${user.discriminator % 5}.png`
+            }
+
+            if (UserData.Country !== "Country not found") {
+                UserData.Country = Country(UserData.Country)
+            }
+
+            if (UserData.Country === "Tor") {
+
+                const embed = new MessageEmbed()
+                    .setTitle("User Blocked for using Tor")
+                    .setDescription(`${UserData.User.username}#${UserData.User.discriminator} \`${UserData.User.id}\` has been blocked for using Tor.`)
+                    .setColor("#ff0000")
+                    .setTimestamp()
+                    .addFields([{
+                        name: "IP",
+                        value: UserData.IP,
+                        inline: true
+                    }, {
+                        name: "Country",
+                        value: UserData.Country,
+                        inline: true
+                    }, {
+                        name: "IP Type",
+                        value: UserData.IPType,
+                        inline: true
+                    }, {
+                        name: "IP Description",
+                        value: UserData.IPDescription,
+                        inline: true
+                    }, {
+                        name: "Risk",
+                        value: UserData.Risk === "IP not found" ? "IP not found" : UserData.Risk.join("\n"),
+                        inline: true
+                    }])
+                    .setThumbnail(userImage)
+
+                await webhook.send({
+                    embeds: [embed]
+                })
+
+                return reply.code(401).redirect("https://http.cat/401")
+            }
+
+            const list = fs.readFileSync("./IPcount.json", "utf8")
+            const listJSON = JSON.parse(list)
+
+            if (listJSON[UserData.IP] === undefined) {
+                listJSON[UserData.IP] = {
+                    IP: UserData.IP,
+                    LastLogin: dayjs().toISOString(),
+                }
+            } else if (dayjs(listJSON[UserData.IP].LastLogin).add(6, "hours").isBefore(dayjs())) {
+                return reply.code(429).redirect("https://http.cat/429")
+            } else {
+                listJSON[UserData.IP].LastLogin = dayjs().toISOString()
+            }
+
+            fs.writeFileSync("./IPcount.json", JSON.stringify(listJSON))
+
+            const guilds = await fetch(`https://discordapp.com/api/users/@me/guilds`, {
+                headers: {
+                    Authorization: `${oauth2.token_type} ${oauth2.access_token}`
+                }
+            }).then(res => res.json())
+
+            if (!guilds.length) return reply.code(500).send("Error")
+
+            if (!guilds.find(g => g.id === config.discord.guildId)) {
+                await fetch(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
+                    method: "PUT",
+                    headers: {
+                        Authorization: `Bot ${config.discord.botToken}`
+                    },
+                    body: JSON.stringify({
+                        access_token: oauth2.access_token,
+                        roles: [config.discord.roleId]
+                    })
+                })
+            } else {
+                await fetch(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
+                    method: "PATCH",
+                    headers: {
+                        Authorization: `Bot ${config.discord.botToken}`
+                    },
+                    body: JSON.stringify({
+                        roles: [config.discord.roleId]
+                    })
+                })
+            }
+
+            const embed = new MessageEmbed()
+                .setTitle("User Login")
+                .setDescription(`${UserData.User.username}#${UserData.User.discriminator} \`${UserData.User.id}\` has logged in.`)
+                .setColor("#00ff00")
+                .setTimestamp()
+                .addFields([{
+                    name: "IP",
+                    value: UserData.IP,
+                    inline: true
+                }, {
+                    name: "Country",
+                    value: UserData.Country,
+                    inline: true
+                }, {
+                    name: "IP Type",
+                    value: UserData.IPType,
+                    inline: true
+                }, {
+                    name: "IP Description",
+                    value: UserData.IPDescription,
+                    inline: true
+                }, {
+                    name: "Risk",
+                    value: UserData.Risk === "IP not found" ? "IP not found" : UserData.Risk.join("\n"),
+                    inline: true
+                }])
+                .setThumbnail(userImage)
+
+            await webhook.send({
+                embeds: [embed]
+            })
+
+            return reply.code(200).send("Bem vindo! :D " + UserData.User.username + "!\n Agora você está conectado no servidor.")
+        }
+    } catch (e) {
+        console.log(e)
+        return reply.code(500).send("Ocorreu um erro. Tente novamente.")
+    }
 })
 
-const rH = new CronJob('0 0 * * * *', function () {
-    rateHour = 1000
-}, null)
-const rS = new CronJob('0 0 * * * *', function () {
-    rateSec = 45
-}, null)
+app.setNotFoundHandler((request, reply) => {
+    return reply.redirect("/")
+})
 
-app.listen(3001, () => {
-    console.log("Ready to generate invite!")
-    rH.start()
-    rS.start()
+app.listen(config.port, () => {
+    console.log(`Server started on port ${config.port}`)
 })
