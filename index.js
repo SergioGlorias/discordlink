@@ -88,46 +88,6 @@ app.get("/callback", async (request, reply) => {
                 Country: request.headers["cf-ipcountry"] || "Country not found",
             }
 
-            let IPinfo
-
-            if (await checkIPv4(request.headers["cf-connecting-ip"])) {
-                IPinfo = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.cloudflare.accountId}/intel/ip?ipv4=${request.headers["CF-Connecting-IP"]}`, {
-                    headers: {
-                        "X-Auth-Key": config.cloudflare.apiKey,
-                        "X-Auth-Email": config.cloudflare.email
-                    }
-                }).then(res => res.json())
-            } else if (await checkIPv6(request.headers["cf-connecting-ip"])) {
-                IPinfo = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.cloudflare.accountId}/intel/ip?ipv6=${request.headers["CF-Connecting-IP"]}`, {
-                    headers: {
-                        "X-Auth-Key": config.cloudflare.apiKey,
-                        "X-Auth-Email": config.cloudflare.email
-                    }
-                }).then(res => res.json())
-            } else {
-                IPinfo = "IP not found"
-            }
-
-            console.log(IPinfo)
-
-            if (IPinfo !== "IP not found") {
-                if (IPinfo.success === true) {
-                    UserData.IPType = IPinfo.result.belongs_to_ref.type
-                    UserData.IPDescription = IPinfo.result.belongs_to_ref.description
-                    UserData.Risk = IPinfo.result.risk_types.map(risk => risk.name)
-                } else {
-                    UserData.IPType = "Error"
-                    UserData.IPDescription = "Error"
-                    UserData.Risk = "Error"
-                }
-            } else {
-                UserData.IPType = "IP not found"
-                UserData.IPDescription = "IP not found"
-                UserData.Risk = "IP not found"
-            }
-
-            console.log(UserData)
-
             const user = await fetch(`https://discordapp.com/api/users/@me`, {
                 headers: {
                     Authorization: `${oauth2.token_type} ${oauth2.access_token}`
@@ -165,18 +125,6 @@ app.get("/callback", async (request, reply) => {
                     }, {
                         name: "Country",
                         value: UserData.Country,
-                        inline: true
-                    }, {
-                        name: "IP Type",
-                        value: UserData.IPType,
-                        inline: true
-                    }, {
-                        name: "IP Description",
-                        value: UserData.IPDescription,
-                        inline: true
-                    }, {
-                        name: "Risk",
-                        value: UserData.Risk === "IP not found" ? "IP not found" : UserData.Risk.join("\n"),
                         inline: true
                     }])
                     .setThumbnail(userImage)
@@ -247,18 +195,6 @@ app.get("/callback", async (request, reply) => {
                 }, {
                     name: "Country",
                     value: UserData.Country,
-                    inline: true
-                }, {
-                    name: "IP Type",
-                    value: UserData.IPType,
-                    inline: true
-                }, {
-                    name: "IP Description",
-                    value: UserData.IPDescription,
-                    inline: true
-                }, {
-                    name: "Risk",
-                    value: UserData.Risk === "IP not found" ? "IP not found" : UserData.Risk.join("\n"),
                     inline: true
                 }])
                 .setThumbnail(userImage)
