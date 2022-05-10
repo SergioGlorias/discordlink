@@ -28,7 +28,7 @@ async function Country(Country) {
     if (Country === "T1") {
         response = "Tor"
     } else {
-        response = getName(Country)
+        response = await getName(Country)
     }
 
     return response
@@ -111,7 +111,7 @@ app.get("/callback", async (request, reply) => {
             }
 
             if (UserData.Country !== "Country not found") {
-                UserData.Country = Country(UserData.Country)
+                UserData.Country = await Country(UserData.Country)
             }
 
             if (UserData.Country === "Tor") {
