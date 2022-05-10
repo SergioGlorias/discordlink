@@ -7,7 +7,7 @@ import fastifyOauth2 from "@fastify/oauth2"
 
 const app = fastify({ logger: true })
 
-import fetch from "node-fetch"
+import axios from "axios"
 
 import { getName } from "country-list"
 
@@ -91,11 +91,12 @@ app.get("/callback", async (request, reply) => {
             // UserData.IP is array or string
             if (Array.isArray(UserData.IP)) UserData.IP = UserData.IP.join("\n")
 
-            const user = await fetch(`https://discordapp.com/api/users/@me`, {
+            const user = await axios.get(`https://discordapp.com/api/users/@me`, {
                 headers: {
                     Authorization: `${oauth2.token_type} ${oauth2.access_token}`
                 }
-            }).then(res => res.json())
+            }).then(res => res.data)
+
 
             if (!user.id) return reply.code(500).send("Error")
 
@@ -155,37 +156,31 @@ app.get("/callback", async (request, reply) => {
 
             fs.writeFileSync("./IPcount.json", JSON.stringify(listJSON))
 
-            const guilds = await fetch(`https://discordapp.com/api/users/@me/guilds`, {
+            const guilds = await axios.get(`https://discordapp.com/api/users/@me/guilds`, {
                 headers: {
                     Authorization: `${oauth2.token_type} ${oauth2.access_token}`
                 }
-            }).then(res => res.json())
+            }).then(res => res.data)
 
             if (!guilds.length) return reply.code(500).send("Error")
 
             if (!guilds.find(g => g.id === config.discord.guildId)) {
-                await fetch(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
-                    method: "PUT",
+                await axios.put(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
+                    access_token: oauth2.access_token,
+                    roles: [config.discord.roleId]
+                }, {
                     headers: {
                         Authorization: `Bot ${config.discord.botToken}`,
                         "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        access_token: oauth2.access_token,
-                        roles: [config.discord.roleId]
-                    })
-                }).then(res => res.json()).then(res => console.log(res))
+                    }
+                })
             } else {
-                await fetch(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}`, {
-                    method: "PATCH",
+                await axios.put(`https://discordapp.com/api/guilds/${config.discord.guildId}/members/${user.id}/roles/${config.discord.roleId}`, {}, {
                     headers: {
                         Authorization: `Bot ${config.discord.botToken}`,
                         "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        roles: [config.discord.roleId]
-                    })
-                }).then(res => res.json()).then(res => console.log(res))
+                    }
+                })
             }
 
             const embed = new MessageEmbed()
