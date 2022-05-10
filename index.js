@@ -60,7 +60,7 @@ app.register(fastifyOauth2, {
     },
     scope: ["identify", "guilds", "guilds.join"],
     startRedirectPath: "/",
-    callbackUri: `http://${config.domain}/callback`,
+    callbackUri: `https://${config.domain}/callback`,
     generateStateFunction: (request) => {
         const state = crypto.randomBytes(20).toString("hex")
         validStates.add(state)
