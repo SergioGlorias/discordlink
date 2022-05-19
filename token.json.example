@@ -8,11 +8,5 @@
         "botToken": "",
         "roleId": "",
         "guildId": ""
-    },
-
-    "cloudflare": {
-        "email": "",
-        "apiKey": "",
-        "accountId": ""
     }
 }
